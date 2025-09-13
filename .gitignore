@@ -43,3 +43,4 @@ Thumbs.db
 # Keys (do NOT commit real private keys)
 keys/*.pem
 !keys/README.md
+/generated/prisma

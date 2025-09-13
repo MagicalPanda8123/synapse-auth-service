@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id              String  @id @default(uuid())
+  email           String  @unique
+  passwordHash    String
+  isEmailVerified Boolean @default(false)
+
+  role   AccountRole   @default(USER)
+  status AccountStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+enum AccountRole {
+  USER
+  SYSTEM_ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  BANNED
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  accountId String
+  tokenHash String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([expiresAt])
+  @@index([accountId, revoked])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  accountId String
+  tokenHash String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([expiresAt])
+}
