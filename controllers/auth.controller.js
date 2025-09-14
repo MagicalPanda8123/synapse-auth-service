@@ -1,5 +1,6 @@
 import {
   login,
+  logout,
   refreshAccessToken,
   registerAccount,
   resendVerificationCode,
@@ -72,6 +73,19 @@ export async function refreshController(req, res, next) {
     }
     const result = await refreshAccessToken(refresh_token)
     res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function logoutController(req, res, next) {
+  try {
+    const { refresh_token } = req.body
+    if (!refresh_token) {
+      return res.status(400).json({ error: 'Refresh token is required' })
+    }
+    await logout(refresh_token)
+    res.json({ message: 'Logged out successfully' })
   } catch (error) {
     next(error)
   }

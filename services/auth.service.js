@@ -25,6 +25,7 @@ import {
 import {
   createRefreshToken,
   findRefreshTokenByHash,
+  revokeRefreshTokenByHash,
   revokeRefreshTokenById,
 } from '../repositories/refreshToken.repository.js'
 
@@ -195,4 +196,9 @@ export async function refreshAccessToken(refreshToken) {
       role: account.role,
     },
   }
+}
+
+export async function logout(refreshToken) {
+  const tokenHash = hashRefreshToken(refreshToken)
+  await revokeRefreshTokenByHash(tokenHash)
 }
