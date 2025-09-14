@@ -18,3 +18,10 @@ export async function revokeRefreshTokenById(id) {
     data: { revoked: true },
   })
 }
+
+export async function revokeAllRefreshTokensForAccount(accountId) {
+  return await prisma.refreshToken.updateMany({
+    where: { accountId, revoked: false },
+    data: { revoked: true },
+  })
+}

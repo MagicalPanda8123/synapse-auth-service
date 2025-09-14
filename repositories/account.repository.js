@@ -18,3 +18,10 @@ export async function verifyAccountEmail(accountId) {
     data: { isEmailVerified: true, status: 'ACTIVE' },
   })
 }
+
+export async function updateAccountPassword(accountId, newHash) {
+  return await prisma.account.update({
+    where: { id: accountId },
+    data: { passwordHash: newHash },
+  })
+}

@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import {
+  changePassWordController,
   loginController,
   refreshController,
   register,
@@ -25,5 +26,7 @@ router.get('/jwks.json', serveJWKS)
 router.post('/login', loginController)
 
 router.post('/refresh', refreshController)
+
+router.post('/change-password', changePassWordController)
 
 export default router
