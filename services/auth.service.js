@@ -4,7 +4,7 @@ import {
   generateVerificationCode,
   hashVerificationCode,
 } from '../utils/verificationCode.js'
-import { hashPassword } from '../utils/password.js'
+import { hashPassword, verifyPassword } from '../utils/password.js'
 import {
   createAccount,
   findAccountByEmail,
@@ -16,6 +16,7 @@ import {
   invalidateVerificationTokens,
   markVerificationTokenUsed,
 } from '../repositories/verificationToken.repository.js'
+import { signJwt } from '../utils/jwt.js'
 
 export async function registerAccount(email, password, username) {
   // Check if user exists
@@ -97,4 +98,35 @@ export async function verifyEmailCode(email, code) {
   await verifyAccountEmail(account.id)
 
   return { message: 'Email verified successfully' }
+}
+
+export async function login(email, password) {
+  const account = await findAccountByEmail(email)
+  if (!account) throw new Error('Invalid email')
+  if (!account.isEmailVerified) throw new Error('Email not verified')
+
+  const valid = await verifyPassword(account.passwordHash, password)
+  if (!valid) throw new Error('Incorrect password')
+
+  // Prepare JWT payload
+  const payload = {
+    sub: account.id,
+    email: account.email,
+    role: account.role,
+  }
+
+  const access_token = await signJwt(payload, { expiresAt: '15min' })
+  const refresh_token = 'daddy chill </3'
+
+  return {
+    access_token,
+    token_type: 'Bearer',
+    expires_in: 900, // 15min in seconds
+    refresh_token,
+    user: {
+      id: account.id,
+      email: account.email,
+      role: account.role,
+    },
+  }
 }

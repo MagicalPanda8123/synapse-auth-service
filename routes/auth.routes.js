@@ -1,7 +1,9 @@
 import { Router } from 'express'
 import {
+  loginController,
   register,
   resendVerification,
+  serveJWKS,
   verifyEmail,
 } from '../controllers/auth.controller.js'
 
@@ -16,5 +18,9 @@ router.post('/register', register)
 router.post('/resend-verification', resendVerification)
 
 router.post('/verify-email', verifyEmail)
+
+router.get('/jwks.json', serveJWKS)
+
+router.post('/login', loginController)
 
 export default router
