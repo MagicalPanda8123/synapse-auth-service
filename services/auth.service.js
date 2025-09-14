@@ -4,10 +4,11 @@ import {
   generateVerificationCode,
   hashVerificationCode,
 } from '../utils/verificationCode.js'
-import { hashPassword } from '../utils/password.js'
+import { hashPassword, verifyPassword } from '../utils/password.js'
 import {
   createAccount,
   findAccountByEmail,
+  findAccountById,
   verifyAccountEmail,
 } from '../repositories/account.repository.js'
 import {
@@ -16,6 +17,16 @@ import {
   invalidateVerificationTokens,
   markVerificationTokenUsed,
 } from '../repositories/verificationToken.repository.js'
+import {
+  generateRefreshToken,
+  hashRefreshToken,
+  signJwt,
+} from '../utils/jwt.js'
+import {
+  createRefreshToken,
+  findRefreshTokenByHash,
+  revokeRefreshTokenById,
+} from '../repositories/refreshToken.repository.js'
 
 export async function registerAccount(email, password, username) {
   // Check if user exists
@@ -97,4 +108,91 @@ export async function verifyEmailCode(email, code) {
   await verifyAccountEmail(account.id)
 
   return { message: 'Email verified successfully' }
+}
+
+export async function login(email, password) {
+  const account = await findAccountByEmail(email)
+  if (!account) throw new Error('Invalid email')
+  if (!account.isEmailVerified) throw new Error('Email not verified')
+
+  const valid = await verifyPassword(account.passwordHash, password)
+  if (!valid) throw new Error('Incorrect password')
+
+  // Prepare JWT payload
+  const payload = {
+    sub: account.id,
+    email: account.email,
+    role: account.role,
+  }
+
+  // access token
+  const access_token = await signJwt(payload, { expiresIn: '15min' })
+
+  // refrsh token
+  const refresh_token = generateRefreshToken()
+  const hashedRefreshToken = hashRefreshToken(refresh_token)
+  // console.log(`hashed refresh token : ${hashedRefreshToken}`)
+
+  await createRefreshToken({
+    accountId: account.id,
+    tokenHash: hashedRefreshToken,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+  })
+
+  return {
+    access_token,
+    token_type: 'Bearer',
+    expires_in: 900, // 15min in seconds
+    refresh_token,
+    user: {
+      id: account.id,
+      email: account.email,
+      role: account.role,
+    },
+  }
+}
+
+export async function refreshAccessToken(refreshToken) {
+  const tokenHash = hashRefreshToken(refreshToken)
+  const tokenRecord = await findRefreshTokenByHash(tokenHash)
+  if (!tokenRecord) throw new Error('Invalid or expired refresh token')
+
+  // Rotate the refresh token
+  await revokeRefreshTokenById(tokenRecord.id)
+
+  // Get the associated account
+  const account = await findAccountById(tokenRecord.accountId)
+  if (!account) throw new Error('Account not found')
+
+  //Issue new token set (access + refresh)
+
+  // new access token
+  const payload = {
+    sub: account.id,
+    email: account.email,
+    role: account.role,
+  }
+  const access_token = await signJwt(payload, { expiresIn: '15min' })
+
+  // new refresh token
+  const newRefreshToken = generateRefreshToken()
+  const hashedNewRefreshToken = hashRefreshToken(newRefreshToken)
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+  await createRefreshToken({
+    accountId: account.id,
+    tokenHash: hashedNewRefreshToken,
+    expiresAt,
+  })
+
+  return {
+    access_token,
+    token_type: 'Bearer',
+    expires_in: 900,
+    refresh_token: newRefreshToken,
+    user: {
+      id: account.id,
+      email: account.email,
+      role: account.role,
+    },
+  }
 }

@@ -1,5 +1,9 @@
 import prisma from '../config/prisma.js'
 
+export async function findAccountById(id) {
+  return await prisma.account.findUnique({ where: { id } })
+}
+
 export async function findAccountByEmail(email) {
   return await prisma.account.findUnique({ where: { email } })
 }

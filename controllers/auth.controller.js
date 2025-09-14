@@ -1,8 +1,11 @@
 import {
+  login,
+  refreshAccessToken,
   registerAccount,
   resendVerificationCode,
   verifyEmailCode,
 } from '../services/auth.service.js'
+import { getJWKS } from '../utils/jwks.js'
 
 export async function register(req, res, next) {
   try {
@@ -39,6 +42,36 @@ export async function verifyEmail(req, res, next) {
     }
     await verifyEmailCode(email, code)
     res.json({ message: 'Email verified successfully' })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export function serveJWKS(req, res, next) {
+  return res.status(200).json(getJWKS())
+}
+
+export async function loginController(req, res, next) {
+  try {
+    const { email, password } = req.body
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+    const result = await login(email, password)
+    res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function refreshController(req, res, next) {
+  try {
+    const { refresh_token } = req.body
+    if (!refresh_token) {
+      return res.status(400).json({ error: 'Refresh token is required' })
+    }
+    const result = await refreshAccessToken(refresh_token)
+    res.json(result)
   } catch (error) {
     next(error)
   }
