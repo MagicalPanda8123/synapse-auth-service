@@ -1,6 +1,6 @@
 // centralized error handler middleware
 export function errorHandler(err, req, res, next) {
-  console.log(err) // will replace with logger (pino)
+  console.log(err.stack) // will replace with logger (pino)
 
   // set default values
   const statusCode = err.statusCode || 500
