@@ -1,4 +1,5 @@
 import {
+  changePassword,
   login,
   logout,
   refreshAccessToken,
@@ -86,6 +87,22 @@ export async function logoutController(req, res, next) {
     }
     await logout(refresh_token)
     res.json({ message: 'Logged out successfully' })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function changePassWordController(req, res, next) {
+  try {
+    const { account_id, current_password, new_password } = req.body
+    if (!account_id || !current_password || !new_password) {
+      return res.status(400).json({
+        error:
+          'Missing required fields (account_id, current_password, new_password)',
+      })
+    }
+    await changePassword(account_id, current_password, new_password)
+    res.json({ message: 'Password changed successfully' })
   } catch (error) {
     next(error)
   }

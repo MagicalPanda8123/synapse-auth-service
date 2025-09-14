@@ -9,6 +9,7 @@ import {
   createAccount,
   findAccountByEmail,
   findAccountById,
+  updateAccountPassword,
   verifyAccountEmail,
 } from '../repositories/account.repository.js'
 import {
@@ -26,6 +27,7 @@ import {
   createRefreshToken,
   findRefreshTokenByHash,
   revokeRefreshTokenByHash,
+  revokeAllRefreshTokensForAccount,
   revokeRefreshTokenById,
 } from '../repositories/refreshToken.repository.js'
 
@@ -201,4 +203,18 @@ export async function refreshAccessToken(refreshToken) {
 export async function logout(refreshToken) {
   const tokenHash = hashRefreshToken(refreshToken)
   await revokeRefreshTokenByHash(tokenHash)
+}
+
+export async function changePassword(accountId, currentPassword, newPassword) {
+  const account = await findAccountById(accountId)
+  if (!account) throw new Error('Account not found')
+
+  const valid = await verifyPassword(account.passwordHash, currentPassword)
+  if (!valid) throw new Error('Current password is incorrect')
+
+  const newPasswordHash = await hashPassword(newPassword)
+  await updateAccountPassword(account.id, newPasswordHash)
+  await revokeAllRefreshTokensForAccount(account.id)
+
+  return { message: 'Password changed successfully' }
 }

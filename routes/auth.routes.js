@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import {
+  changePassWordController,
   loginController,
   logoutController,
   refreshController,
@@ -28,5 +29,7 @@ router.post('/login', loginController)
 router.post('/refresh', refreshController)
 
 router.post('/logout', logoutController)
+
+router.post('/change-password', changePassWordController)
 
 export default router
