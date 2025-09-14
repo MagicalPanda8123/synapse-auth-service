@@ -1,5 +1,6 @@
 import {
   login,
+  refreshAccessToken,
   registerAccount,
   resendVerificationCode,
   verifyEmailCode,
@@ -57,6 +58,19 @@ export async function loginController(req, res, next) {
       return res.status(400).json({ error: 'Email and password are required' })
     }
     const result = await login(email, password)
+    res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function refreshController(req, res, next) {
+  try {
+    const { refresh_token } = req.body
+    if (!refresh_token) {
+      return res.status(400).json({ error: 'Refresh token is required' })
+    }
+    const result = await refreshAccessToken(refresh_token)
     res.json(result)
   } catch (error) {
     next(error)

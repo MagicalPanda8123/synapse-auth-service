@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises'
 import { importPKCS8, SignJWT } from 'jose'
+import crypto from 'crypto'
 
 /**
  * PEM - Privacy Enhanced Mail
@@ -30,4 +31,13 @@ export async function signJwt(payload, options = {}) {
     .setIssuedAt()
     .setExpirationTime(options.expiresIn || '15min')
     .sign(privateKey)
+}
+
+export function generateRefreshToken() {
+  // extremely unlikely to produce 2 identical tokens here
+  return crypto.randomBytes(32).toString('hex')
+}
+
+export function hashRefreshToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex')
 }
