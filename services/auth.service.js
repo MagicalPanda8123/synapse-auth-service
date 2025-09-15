@@ -1,9 +1,8 @@
-import prisma from '../config/prisma.js'
-import { publishAccountRegistered } from '../events/publishers/accountRegistered.publisher.js'
 import {
   generateVerificationCode,
   hashVerificationCode,
-} from '../utils/verificationCode.js'
+  verifyCodeHash,
+} from '../utils/verification-code.js'
 import { hashPassword, verifyPassword } from '../utils/password.js'
 import {
   createAccount,
@@ -17,11 +16,12 @@ import {
   findValidVerificationToken,
   invalidateVerificationTokens,
   markVerificationTokenUsed,
-} from '../repositories/verificationToken.repository.js'
+} from '../repositories/verification-token.repository.js'
 import {
   generateRefreshToken,
   hashRefreshToken,
   signJwt,
+  verifyJwt,
 } from '../utils/jwt.js'
 import {
   createRefreshToken,
@@ -29,7 +29,16 @@ import {
   revokeRefreshTokenByHash,
   revokeAllRefreshTokensForAccount,
   revokeRefreshTokenById,
-} from '../repositories/refreshToken.repository.js'
+} from '../repositories/refresh-token.repository.js'
+import {
+  createPasswordResetToken,
+  findValidPasswordResetToken,
+} from '../repositories/password-reset-token.repository.js'
+import {
+  publishAccountRegistered,
+  publishPasswordChanged,
+  publishPasswordResetRequested,
+} from '../events/publishers/account.publisher.js'
 
 export async function registerAccount(email, password, username) {
   // Check if user exists
@@ -85,6 +94,7 @@ export async function resendVerificationCode(email) {
     expiresAt,
   })
 
+  // Publish event to RabbitMQ for notification service
   await publishAccountRegistered({ email: account.email, code })
 
   return { message: 'Verification code resent' }
@@ -205,8 +215,8 @@ export async function logout(refreshToken) {
   await revokeRefreshTokenByHash(tokenHash)
 }
 
-export async function changePassword(accountId, currentPassword, newPassword) {
-  const account = await findAccountById(accountId)
+export async function changePassword(email, currentPassword, newPassword) {
+  const account = await findAccountByEmail(email)
   if (!account) throw new Error('Account not found')
 
   const valid = await verifyPassword(account.passwordHash, currentPassword)
@@ -216,5 +226,71 @@ export async function changePassword(accountId, currentPassword, newPassword) {
   await updateAccountPassword(account.id, newPasswordHash)
   await revokeAllRefreshTokensForAccount(account.id)
 
+  // Publish event to RabbitMQ for notification service
+  await publishPasswordChanged({ email: account.email })
+
   return { message: 'Password changed successfully' }
+}
+
+export async function requestPasswordReset(email) {
+  const account = await findAccountByEmail(email)
+  if (!account) return
+
+  // Generate and store password-reset code
+  const code = generateVerificationCode()
+  const codeHash = hashVerificationCode(code)
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 min
+
+  await createPasswordResetToken({
+    accountId: account.id,
+    tokenHash: codeHash,
+    expiresAt,
+  })
+
+  // Publish event to RabbitMQ for notification service
+  await publishPasswordResetRequested({ email, code })
+
+  return { message: 'Password reset code sent' }
+}
+
+export async function verfiyPasswordResetCode(email, code) {
+  const account = await findAccountByEmail(email)
+  if (!account) throw new Error('Account not found')
+
+  const tokenRecord = await findValidPasswordResetToken(account.id)
+  if (!tokenRecord) throw new Error('No valid reset code found or code expired')
+
+  const valid = verifyCodeHash(code, tokenRecord.tokenHash)
+  if (!valid) throw new Error('Invalid reset code')
+
+  // Issue a short-lived JWT for password reset
+  const payload = {
+    sub: account.id,
+    email: account.email,
+    purpose: 'password_reset',
+  }
+  const reset_token = await signJwt(payload, { expiresIn: '5m' })
+
+  return { reset_token, expires_in: 300 }
+}
+
+export async function setNewPassword(resetToken, newPassword) {
+  // verify the reset token
+  const payload = await verifyJwt(resetToken)
+
+  // check purpose claim
+  if (payload.purpose !== 'password_reset') {
+    throw new Error('Invalid token expired')
+  }
+
+  // find the account
+  const account = await findAccountByEmail(payload.email)
+  if (!account) throw new Error('Account not found')
+
+  // update password and revoke all refresh tokens
+  const newPasswordHash = await hashPassword(newPassword)
+  await updateAccountPassword(account.id, newPasswordHash)
+  await revokeAllRefreshTokensForAccount(account.id)
+
+  return { message: 'Password reset successfully' }
 }

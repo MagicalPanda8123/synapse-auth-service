@@ -5,9 +5,12 @@ import {
   logoutController,
   refreshController,
   register,
+  requestPasswordResetController,
   resendVerification,
   serveJWKS,
+  setNewPasswordController,
   verifyEmail,
+  verifyPasswordResetCodeController,
 } from '../controllers/auth.controller.js'
 
 const router = Router()
@@ -31,5 +34,11 @@ router.post('/refresh', refreshController)
 router.post('/logout', logoutController)
 
 router.post('/change-password', changePassWordController)
+
+router.post('/request-password-reset', requestPasswordResetController)
+
+router.post('/verify-reset-code', verifyPasswordResetCodeController)
+
+router.post('/set-new-password', setNewPasswordController)
 
 export default router
