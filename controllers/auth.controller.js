@@ -4,7 +4,10 @@ import {
   logout,
   refreshAccessToken,
   registerAccount,
+  requestPasswordReset,
   resendVerificationCode,
+  setNewPassword,
+  verfiyPasswordResetCode,
   verifyEmailCode,
 } from '../services/auth.service.js'
 import { getJWKS } from '../utils/jwks.js'
@@ -94,15 +97,56 @@ export async function logoutController(req, res, next) {
 
 export async function changePassWordController(req, res, next) {
   try {
-    const { account_id, current_password, new_password } = req.body
-    if (!account_id || !current_password || !new_password) {
+    const { email, current_password, new_password } = req.body
+    if (!email || !current_password || !new_password) {
       return res.status(400).json({
         error:
-          'Missing required fields (account_id, current_password, new_password)',
+          'Missing required fields (email, current_password, new_password)',
       })
     }
-    await changePassword(account_id, current_password, new_password)
+    await changePassword(email, current_password, new_password)
     res.json({ message: 'Password changed successfully' })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function requestPasswordResetController(req, res, next) {
+  try {
+    const { email } = req.body
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+    await requestPasswordReset(email)
+    res.json({ message: 'Reset code sent' })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function verifyPasswordResetCodeController(req, res, next) {
+  try {
+    const { email, code } = req.body
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and reset code are reuired' })
+    }
+    const result = await verfiyPasswordResetCode(email, code)
+    res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function setNewPasswordController(req, res, next) {
+  try {
+    const { reset_token, new_password } = req.body
+    if (!reset_token || !new_password) {
+      return res
+        .status(400)
+        .json({ error: 'Reset token and new password are required' })
+    }
+    const result = await setNewPassword(reset_token, new_password)
+    res.json(result)
   } catch (error) {
     next(error)
   }

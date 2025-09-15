@@ -1,6 +1,8 @@
 import { readFile } from 'fs/promises'
-import { importPKCS8, SignJWT } from 'jose'
+import { importPKCS8, importSPKI, jwtVerify, SignJWT } from 'jose'
 import crypto from 'crypto'
+
+let publicKey
 
 /**
  * PEM - Privacy Enhanced Mail
@@ -40,4 +42,25 @@ export function generateRefreshToken() {
 
 export function hashRefreshToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+export async function getPublicKey() {
+  if (!publicKey) {
+    const publicKeyPem = await readFile('./keys/public.pem', 'utf8')
+    publicKey = await importSPKI(publicKeyPem, 'RS256')
+  }
+  return publicKey
+}
+
+export async function verifyJwt(token, options = {}) {
+  const key = await getPublicKey()
+  try {
+    const { payload } = await jwtVerify(token, key, {
+      algorithms: ['RS256'],
+      ...options,
+    })
+    return payload
+  } catch (error) {
+    throw new Error('Invalid or expired token')
+  }
 }
