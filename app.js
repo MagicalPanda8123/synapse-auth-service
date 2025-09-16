@@ -1,10 +1,10 @@
 import express from 'express'
 import cors from 'cors'
-import routes from './routes/index.js'
 import helmet from 'helmet'
 import os from 'os'
-import { errorHandler } from './middleware/error.middleware.js'
+import routes from './routes/index.js'
 import prisma from './config/prisma.js'
+import { errorHandler } from './middleware/error.middleware.js'
 
 const app = express()
 
