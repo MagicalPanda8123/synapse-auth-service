@@ -48,7 +48,8 @@ export async function registerAccount(
   password,
   username,
   firstName,
-  lastName
+  lastName,
+  gender
 ) {
   // Check if user exists
   const existing = await findAccountByEmail(email)
@@ -89,6 +90,7 @@ export async function registerAccount(
         username,
         first_name: firstName,
         last_name: lastName,
+        gender,
       },
       {
         headers: {
