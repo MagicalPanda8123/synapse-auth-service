@@ -6,6 +6,7 @@ import {
 import { hashPassword, verifyPassword } from '../utils/password.js'
 import {
   createAccount,
+  deleteAccount,
   findAccountByEmail,
   findAccountById,
   updateAccountPassword,
@@ -20,6 +21,7 @@ import {
 import {
   generateRefreshToken,
   hashRefreshToken,
+  signInternalJwt,
   signJwt,
   verifyJwt,
 } from '../utils/jwt.js'
@@ -39,8 +41,15 @@ import {
   publishPasswordChanged,
   publishPasswordResetRequested,
 } from '../events/publishers/account.publisher.js'
+import axios from 'axios'
 
-export async function registerAccount(email, password, username) {
+export async function registerAccount(
+  email,
+  password,
+  username,
+  firstName,
+  lastName
+) {
   // Check if user exists
   const existing = await findAccountByEmail(email)
   if (existing) {
@@ -55,6 +64,50 @@ export async function registerAccount(email, password, username) {
     email,
     passwordHash: hashedPassword,
   })
+
+  // Issue internal JWT for service-to-service communication
+  const internalJwt = await signInternalJwt(
+    {
+      //custom claims
+      permissions: ['users:create'],
+    },
+    {
+      iss: 'auth-service',
+      sub: 'auth-service',
+      aud: 'user-service',
+      expiresIn: '5m',
+    }
+  )
+
+  // Send request to User service to create a new user
+  let user
+  try {
+    user = await axios.post(
+      process.env.USER_SERVICE_URL,
+      {
+        account_id: account.id,
+        username,
+        first_name: firstName,
+        last_name: lastName,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${internalJwt}`,
+        },
+      }
+    )
+  } catch (err) {
+    console.error(
+      '[User Service] Failed to create user:',
+      err.response?.data || err.message
+    )
+
+    //Rollback: delete the newly created account
+    await deleteAccount(account.id)
+    throw new Error('Failed to create user profile in user service')
+  }
+
+  console.log(`[User Service] user created : `, user.data)
 
   // Generate and store verification code
   const code = generateVerificationCode()
@@ -72,7 +125,7 @@ export async function registerAccount(email, password, username) {
   // Publish event to RabbitMQ for notification service
   await publishAccountRegistered({ email, username, code })
 
-  return account
+  return true
 }
 
 export async function resendVerificationCode(email) {
@@ -131,7 +184,7 @@ export async function login(email, password) {
   const valid = await verifyPassword(account.passwordHash, password)
   if (!valid) throw new Error('Incorrect password')
 
-  // Prepare JWT payload
+  // Prepare JWT payload (custom claims)
   const payload = {
     sub: account.id,
     email: account.email,
@@ -139,7 +192,12 @@ export async function login(email, password) {
   }
 
   // access token
-  const access_token = await signJwt(payload, { expiresIn: '15min' })
+  const access_token = await signJwt(payload, {
+    iss: 'auth-service',
+    sub: 'auth-service',
+    aud: 'user-service',
+    expiresIn: '15min',
+  })
 
   // refrsh token
   const refresh_token = generateRefreshToken()
