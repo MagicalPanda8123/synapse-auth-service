@@ -24,12 +24,31 @@ const privateKey = await importPKCS8(privateKeyPem, 'RS256')
 export async function signJwt(payload, options = {}) {
   // a typical jwt (header.payload.signature)
   return await new SignJWT(payload)
-    // it's called "protected" because this header is also signed in conjunction with the payload.
+    .setProtectedHeader({
+      // it's called "protected" because this header is also signed in conjunction with the payload.
+      alg: 'RS256',
+      typ: 'JWT',
+      kid: 'main',
+    })
+    .setIssuer(options.iss)
+    .setSubject(options.sub)
+    .setAudience(options.setAudience)
+    .setIssuedAt()
+    .setExpirationTime(options.expiresIn || '15min')
+    .sign(privateKey)
+}
+
+// Sign internal JWT
+export async function signInternalJwt(payload, options = {}) {
+  return await new SignJWT(payload)
     .setProtectedHeader({
       alg: 'RS256',
       typ: 'JWT',
       kid: 'main',
     })
+    .setIssuer(options.iss)
+    .setSubject(options.sub)
+    .setAudience(options.setAudience)
     .setIssuedAt()
     .setExpirationTime(options.expiresIn || '15min')
     .sign(privateKey)

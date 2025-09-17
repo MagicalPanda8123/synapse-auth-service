@@ -14,13 +14,16 @@ import { getJWKS } from '../utils/jwks.js'
 
 export async function register(req, res, next) {
   try {
-    const { email, password } = req.body
-    const username = `${req.body.firstName} ${req.body.lastName}`
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' })
+    const { email, password, username, first_name, last_name } = req.body
+    // const username = `${req.body.firstName} ${req.body.lastName}`
+    if (!email || !password || !username || !first_name || !last_name) {
+      return res.status(400).json({
+        error:
+          'email, password, username, first_name and last_name are required',
+      })
     }
-    const account = await registerAccount(email, password, username)
-    res.status(201).json({ account })
+    await registerAccount(email, password, username, first_name, last_name)
+    res.status(201).json({ message: 'Account created successfully' })
   } catch (error) {
     next(error)
   }
