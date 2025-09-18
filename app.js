@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 import os from 'os'
 import routes from './routes/index.js'
 import prisma from './config/prisma.js'
@@ -13,6 +14,7 @@ app.use(helmet())
 app.use(cors({ origin: '*' })) // adjust for production
 
 // 🧰 built-in middlewares
+app.use(cookieParser())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 

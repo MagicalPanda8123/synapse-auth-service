@@ -14,28 +14,27 @@ import { getJWKS } from '../utils/jwks.js'
 
 export async function register(req, res, next) {
   try {
-    const { email, password, username, first_name, last_name, gender } =
-      req.body
+    const { email, password, username, firstName, lastName, gender } = req.body
     // const username = `${req.body.firstName} ${req.body.lastName}`
     if (
       !email ||
       !password ||
       !username ||
-      !first_name ||
-      !last_name ||
+      !firstName ||
+      !lastName ||
       !gender
     ) {
       return res.status(400).json({
         error:
-          'email, password, username, first_name, last_name, gender are required',
+          'email, password, username, firstName, lastName, gender are required',
       })
     }
     await registerAccount(
       email,
       password,
       username,
-      first_name,
-      last_name,
+      firstName,
+      lastName,
       gender
     )
     res.status(201).json({ message: 'Account created successfully' })
@@ -80,8 +79,18 @@ export async function loginController(req, res, next) {
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' })
     }
+
     const result = await login(email, password)
-    res.json(result)
+
+    // extract refreshToken and set in HTTP-only cookie
+    const { refreshToken, ...filtered } = result
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, //  7 days of expiry
+    })
+    res.json(filtered)
   } catch (error) {
     next(error)
   }
@@ -89,12 +98,22 @@ export async function loginController(req, res, next) {
 
 export async function refreshController(req, res, next) {
   try {
-    const { refresh_token } = req.body
-    if (!refresh_token) {
+    // Read refresh token from cookie
+    const refreshToken = req.cookies.refreshToken
+    if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token is required' })
     }
-    const result = await refreshAccessToken(refresh_token)
-    res.json(result)
+    const result = await refreshAccessToken(refreshToken)
+
+    // extract refreshToken and set in HTTP-only cookie
+    const { refreshToken: newRefreshToken, ...filtered } = result
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, //  7 days of expiry
+    })
+    res.json(filtered)
   } catch (error) {
     next(error)
   }
@@ -102,11 +121,15 @@ export async function refreshController(req, res, next) {
 
 export async function logoutController(req, res, next) {
   try {
-    const { refresh_token } = req.body
-    if (!refresh_token) {
+    // Read refresh token from cookie
+    const refreshToken = req.cookies.refreshToken
+    if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token is required' })
     }
-    await logout(refresh_token)
+    await logout(refreshToken)
+
+    // clear the cookie after logging out
+    res.clearCookie('refreshToken')
     res.json({ message: 'Logged out successfully' })
   } catch (error) {
     next(error)
