@@ -2,8 +2,15 @@ import {
   generateVerificationCode,
   hashVerificationCode,
   verifyCodeHash,
-} from '../utils/verification-code.js'
-import { hashPassword, verifyPassword } from '../utils/password.js'
+  hashPassword,
+  verifyPassword,
+  signJwt,
+  signInternalJwt,
+  generateRefreshJwt,
+  verifyJwt,
+  verifyRefreshJwt,
+} from '../utils/index.js'
+
 import {
   createAccount,
   deleteAccount,
@@ -11,37 +18,70 @@ import {
   findAccountById,
   updateAccountPassword,
   verifyAccountEmail,
-} from '../repositories/account.repository.js'
-import {
   createVerificationToken,
   findValidVerificationToken,
   invalidateVerificationTokens,
   markVerificationTokenUsed,
-} from '../repositories/verification-token.repository.js'
-import {
-  generateRefreshToken,
-  hashRefreshToken,
-  signInternalJwt,
-  signJwt,
-  verifyJwt,
-} from '../utils/jwt.js'
-import {
   createRefreshToken,
-  findRefreshTokenByHash,
-  revokeRefreshTokenByHash,
-  revokeAllRefreshTokensForAccount,
+  findRefreshTokenByJti,
   revokeRefreshTokenById,
-} from '../repositories/refresh-token.repository.js'
-import {
+  revokeAllRefreshTokensForAccount,
+  revokeRefreshTokenByJti,
   createPasswordResetToken,
   findValidPasswordResetToken,
-} from '../repositories/password-reset-token.repository.js'
+  addUserId,
+} from '../repositories/index.js'
+
 import {
   publishAccountRegistered,
   publishPasswordChanged,
   publishPasswordResetRequested,
 } from '../events/publishers/account.publisher.js'
+
 import axios from 'axios'
+import { randomUUID } from 'crypto'
+
+/**
+ *  HELPER FUNCTIONS HERE -------------------------------------------------------------------------------------
+ */
+async function generateTokenPair(account) {
+  // access token
+  const payload = {
+    email: account.email,
+    role: account.role,
+  }
+  const access_token = await signJwt(payload, {
+    sub: account.userId,
+    iss: 'auth-service',
+    aud: 'synapse-api',
+  })
+
+  // refresh token
+  const jti = randomUUID()
+  const refresh_token = await generateRefreshJwt(account, jti)
+
+  await createRefreshToken({
+    accountId: account.id,
+    jti,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  })
+
+  return {
+    access_token,
+    refresh_token,
+    token_type: 'Bearer',
+    expires_in: 900,
+    user: {
+      id: account.userId,
+      email: account.email,
+      role: account.role,
+    },
+  }
+}
+
+/**
+ * !!! HERE COMES THE MAIN FUNCTIONS ----------------------------------------------------------------------
+ */
 
 export async function registerAccount(
   email,
@@ -81,9 +121,9 @@ export async function registerAccount(
   )
 
   // Send request to User service to create a new user
-  let user
+  let userResponse
   try {
-    user = await axios.post(
+    userResponse = await axios.post(
       process.env.USER_SERVICE_URL,
       {
         account_id: account.id,
@@ -103,13 +143,15 @@ export async function registerAccount(
       '[User Service] Failed to create user:',
       err.response?.data || err.message
     )
-
     //Rollback: delete the newly created account
     await deleteAccount(account.id)
     throw new Error('Failed to create user profile in user service')
   }
 
-  console.log(`[User Service] user created : `, user.data)
+  // add UserId to the account
+  await addUserId(account.id, userResponse.data.id)
+
+  console.log(`[User Service] user created : `, userResponse.data)
 
   // Generate and store verification code
   const code = generateVerificationCode()
@@ -179,100 +221,39 @@ export async function verifyEmailCode(email, code) {
 }
 
 export async function login(email, password) {
+  // find the account
   const account = await findAccountByEmail(email)
-  if (!account) throw new Error('Invalid email')
+  if (!account) throw new Error('Account not found')
   if (!account.isEmailVerified) throw new Error('Email not verified')
 
+  // compare password hashes
   const valid = await verifyPassword(account.passwordHash, password)
   if (!valid) throw new Error('Incorrect password')
 
-  // Prepare JWT payload (custom claims)
-  const payload = {
-    sub: account.id,
-    email: account.email,
-    role: account.role,
-  }
-
-  // access token
-  const access_token = await signJwt(payload, {
-    iss: 'auth-service',
-    sub: 'auth-service',
-    aud: 'user-service',
-    expiresIn: '15min',
-  })
-
-  // refrsh token
-  const refresh_token = generateRefreshToken()
-  const hashedRefreshToken = hashRefreshToken(refresh_token)
-  // console.log(`hashed refresh token : ${hashedRefreshToken}`)
-
-  await createRefreshToken({
-    accountId: account.id,
-    tokenHash: hashedRefreshToken,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-  })
-
-  return {
-    access_token,
-    token_type: 'Bearer',
-    expires_in: 900, // 15min in seconds
-    refresh_token,
-    user: {
-      id: account.id,
-      email: account.email,
-      role: account.role,
-    },
-  }
+  return await generateTokenPair(account)
 }
 
 export async function refreshAccessToken(refreshToken) {
-  const tokenHash = hashRefreshToken(refreshToken)
-  const tokenRecord = await findRefreshTokenByHash(tokenHash)
-  if (!tokenRecord) throw new Error('Invalid or expired refresh token')
+  const refreshPayload = await verifyRefreshJwt(refreshToken)
 
-  // Rotate the refresh token
-  await revokeRefreshTokenById(tokenRecord.id)
+  const tokenRecord = await findRefreshTokenByJti(refreshPayload.jti)
+  if (tokenRecord.revoked) {
+    throw new Error('Refresh token revoked')
+  }
 
   // Get the associated account
-  const account = await findAccountById(tokenRecord.accountId)
+  const account = await findAccountById(refreshPayload.sub)
   if (!account) throw new Error('Account not found')
 
-  //Issue new token set (access + refresh)
+  // revoke this refresh token
+  await revokeRefreshTokenById(tokenRecord.id)
 
-  // new access token
-  const payload = {
-    sub: account.id,
-    email: account.email,
-    role: account.role,
-  }
-  const access_token = await signJwt(payload, { expiresIn: '15min' })
-
-  // new refresh token
-  const newRefreshToken = generateRefreshToken()
-  const hashedNewRefreshToken = hashRefreshToken(newRefreshToken)
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-  await createRefreshToken({
-    accountId: account.id,
-    tokenHash: hashedNewRefreshToken,
-    expiresAt,
-  })
-
-  return {
-    access_token,
-    token_type: 'Bearer',
-    expires_in: 900,
-    refresh_token: newRefreshToken,
-    user: {
-      id: account.id,
-      email: account.email,
-      role: account.role,
-    },
-  }
+  return await generateTokenPair(account)
 }
 
 export async function logout(refreshToken) {
-  const tokenHash = hashRefreshToken(refreshToken)
-  await revokeRefreshTokenByHash(tokenHash)
+  const payload = await verifyRefreshJwt(refreshToken)
+  await revokeRefreshTokenByJti(payload.jti)
 }
 
 export async function changePassword(email, currentPassword, newPassword) {

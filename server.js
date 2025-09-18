@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import app from './app.js'
 import { getChannel } from './config/rabbitmq.js'
 import prisma from './config/prisma.js'

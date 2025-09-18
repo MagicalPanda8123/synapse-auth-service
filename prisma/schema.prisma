@@ -18,6 +18,7 @@ model Account {
   email           String  @unique
   passwordHash    String
   isEmailVerified Boolean @default(false)
+  userId          String? @unique
 
   role   AccountRole   @default(USER)
   status AccountStatus @default(PENDING)
@@ -62,7 +63,7 @@ model VerificationToken {
 model RefreshToken {
   id        String   @id @default(uuid())
   accountId String
-  tokenHash String
+  jti       String
   createdAt DateTime @default(now())
   expiresAt DateTime
   revoked   Boolean  @default(false)

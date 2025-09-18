@@ -1,8 +1,10 @@
 import { readFile } from 'fs/promises'
 import { importSPKI, exportJWK } from 'jose'
 
+const JWT_PUBLIC_KEY_PATH = process.env.JWT_PUBLIC_KEY_PATH
+
 // Load public key (PEM)
-const publicKeyPem = await readFile('./keys/public.pem', 'utf-8')
+const publicKeyPem = await readFile(JWT_PUBLIC_KEY_PATH, 'utf-8')
 
 // Convert PEM to CryptoKey
 const publicKey = await importSPKI(publicKeyPem, 'RS256')
