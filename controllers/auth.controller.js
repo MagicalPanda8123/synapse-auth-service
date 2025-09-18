@@ -138,14 +138,16 @@ export async function logoutController(req, res, next) {
 
 export async function changePassWordController(req, res, next) {
   try {
-    const { email, current_password, new_password } = req.body
-    if (!email || !current_password || !new_password) {
+    const { currentPassword, newPassword } = req.body
+
+    // The user object is appended by auth middleware
+    const { email } = req.user
+    if (!currentPassword || !newPassword) {
       return res.status(400).json({
-        error:
-          'Missing required fields (email, current_password, new_password)',
+        error: 'Missing required fields (currentPassword, newPassword)',
       })
     }
-    await changePassword(email, current_password, new_password)
+    await changePassword(email, currentPassword, newPassword)
     res.json({ message: 'Password changed successfully' })
   } catch (error) {
     next(error)
@@ -180,13 +182,13 @@ export async function verifyPasswordResetCodeController(req, res, next) {
 
 export async function setNewPasswordController(req, res, next) {
   try {
-    const { reset_token, new_password } = req.body
-    if (!reset_token || !new_password) {
+    const { reset_token, newPassword } = req.body
+    if (!reset_token || !newPassword) {
       return res
         .status(400)
         .json({ error: 'Reset token and new password are required' })
     }
-    const result = await setNewPassword(reset_token, new_password)
+    const result = await setNewPassword(reset_token, newPassword)
     res.json(result)
   } catch (error) {
     next(error)
