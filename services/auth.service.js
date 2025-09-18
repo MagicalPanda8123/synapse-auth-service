@@ -50,7 +50,7 @@ async function generateTokenPair(account) {
     email: account.email,
     role: account.role,
   }
-  const access_token = await signJwt(payload, {
+  const accessToken = await signJwt(payload, {
     sub: account.userId,
     iss: 'auth-service',
     aud: 'synapse-api',
@@ -58,7 +58,7 @@ async function generateTokenPair(account) {
 
   // refresh token
   const jti = randomUUID()
-  const refresh_token = await generateRefreshJwt(account, jti)
+  const refreshToken = await generateRefreshJwt(account, jti)
 
   await createRefreshToken({
     accountId: account.id,
@@ -67,10 +67,10 @@ async function generateTokenPair(account) {
   })
 
   return {
-    access_token,
-    refresh_token,
-    token_type: 'Bearer',
-    expires_in: 900,
+    accessToken,
+    refreshToken,
+    tokenType: 'Bearer',
+    expiresIn: 900,
     user: {
       id: account.userId,
       email: account.email,
