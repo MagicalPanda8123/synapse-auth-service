@@ -15,10 +15,10 @@ datasource db {
 
 model Account {
   id              String  @id @default(uuid())
+  userId          String? @unique
   email           String  @unique
   passwordHash    String
   isEmailVerified Boolean @default(false)
-  userId          String? @unique
 
   role   AccountRole   @default(USER)
   status AccountStatus @default(PENDING)
@@ -26,12 +26,56 @@ model Account {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
-  VerificationToken   VerificationToken[]
+  refreshTokens    RefreshToken[]
+  verificationCode VerificationCode[]
 
   @@index([createdAt])
   @@index([status])
+}
+
+model VerificationCode {
+  id        String      @id @default(uuid())
+  purpose   CodePurpose
+  accountId String
+  codeHash  String
+  createdAt DateTime    @default(now())
+  expiresAt DateTime
+  used      Boolean     @default(false)
+
+  account           Account            @relation(fields: [accountId], references: [id])
+  verificationToken VerificationToken?
+
+  @@index([expiresAt])
+  @@index([accountId, purpose, used])
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid())
+  codeId    String   @unique
+  jti       String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+
+  verificationCode VerificationCode @relation(fields: [codeId], references: [id])
+
+  @@index([expiresAt])
+  @@index([revoked])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  accountId String
+  jti       String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([jti])
+  @@index([expiresAt])
+  @@index([accountId, revoked])
 }
 
 enum AccountRole {
@@ -46,45 +90,7 @@ enum AccountStatus {
   BANNED
 }
 
-model VerificationToken {
-  id        String   @id @default(uuid())
-  accountId String
-  tokenHash String
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  used      Boolean  @default(false)
-
-  account Account @relation(fields: [accountId], references: [id])
-
-  @@index([accountId])
-  @@index([expiresAt])
-}
-
-model RefreshToken {
-  id        String   @id @default(uuid())
-  accountId String
-  jti       String
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  revoked   Boolean  @default(false)
-
-  account Account @relation(fields: [accountId], references: [id])
-
-  @@index([accountId])
-  @@index([expiresAt])
-  @@index([accountId, revoked])
-}
-
-model PasswordResetToken {
-  id        String   @id @default(uuid())
-  accountId String
-  tokenHash String
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  used      Boolean  @default(false)
-
-  account Account @relation(fields: [accountId], references: [id])
-
-  @@index([accountId])
-  @@index([expiresAt])
+enum CodePurpose {
+  VERIFY_EMAIL
+  RESET_PASSWORD
 }

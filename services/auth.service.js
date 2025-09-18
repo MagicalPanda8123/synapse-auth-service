@@ -18,18 +18,19 @@ import {
   findAccountById,
   updateAccountPassword,
   verifyAccountEmail,
-  createVerificationToken,
-  findValidVerificationToken,
-  invalidateVerificationTokens,
-  markVerificationTokenUsed,
   createRefreshToken,
   findRefreshTokenByJti,
   revokeRefreshTokenById,
   revokeAllRefreshTokensForAccount,
   revokeRefreshTokenByJti,
-  createPasswordResetToken,
-  findValidPasswordResetToken,
   addUserId,
+  createVerificationCode,
+  invalidateVerificationCode,
+  findValidVerificationCode,
+  invalidateAllVerificationCodes,
+  createVerificationToken,
+  revokeVerificationTokenByJti,
+  findVerificationTokenByJti,
 } from '../repositories/index.js'
 
 import {
@@ -77,6 +78,26 @@ async function generateTokenPair(account) {
       role: account.role,
     },
   }
+}
+
+// Create and Store the verification code with custom purpose and duration (in minutes)
+async function createAndStoreVerificationCode(
+  accountId,
+  purpose,
+  duration = 15
+) {
+  const code = generateVerificationCode()
+  const codeHash = hashVerificationCode(code)
+  const expiresAt = new Date(Date.now() + duration * 60 * 1000) // expiration of 15min
+
+  await createVerificationCode({
+    accountId,
+    codeHash,
+    purpose,
+    expiresAt,
+  })
+
+  return code
 }
 
 /**
@@ -154,15 +175,7 @@ export async function registerAccount(
   console.log(`[User Service] user created : `, userResponse.data)
 
   // Generate and store verification code
-  const code = generateVerificationCode()
-  const codeHash = hashVerificationCode(code)
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // expiration of 15min
-
-  await createVerificationToken({
-    accountId: account.id,
-    tokenHash: codeHash,
-    expiresAt,
-  })
+  const code = await createAndStoreVerificationCode(account.id, 'VERIFY_EMAIL')
 
   // console.log(`verification code for email ${email} : ${code}`)
 
@@ -177,19 +190,11 @@ export async function resendVerificationCode(email) {
   if (!account) throw new Error('Account not found')
   if (account.isEmailVerified) throw new Error('Email already verified')
 
-  // Invalidate previous unused tokens
-  await invalidateVerificationTokens(account.id)
+  // Invalidate previous unused codes
+  await invalidateAllVerificationCodes(account.id)
 
   // Generate and store new code
-  const code = generateVerificationCode()
-  const codeHash = hashVerificationCode(code)
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // expiration of 15min
-
-  await createVerificationToken({
-    accountId: account.id,
-    tokenHash: codeHash,
-    expiresAt,
-  })
+  const code = await createAndStoreVerificationCode(account.id, 'VERIFY_EMAIL')
 
   // Publish event to RabbitMQ for notification service
   await publishAccountRegistered({ email: account.email, code })
@@ -202,19 +207,19 @@ export async function verifyEmailCode(email, code) {
   if (!account) throw new Error('Account not found')
   if (account.isEmailVerified) return
 
-  const tokenRecord = await findValidVerificationToken(account.id)
+  const codeRecord = await findValidVerificationCode(account.id)
 
-  if (!tokenRecord) {
+  if (!codeRecord) {
     throw new Error('No valid verification code found or code has expired')
   }
 
   // compare hashes
   const codeHash = hashVerificationCode(code)
-  if (tokenRecord.tokenHash !== codeHash) {
-    throw new Error('Invalid verification code')
+  if (codeRecord.codeHash !== codeHash) {
+    throw new Error('Incorrect verification code')
   }
 
-  await markVerificationTokenUsed(tokenRecord.id)
+  await invalidateVerificationCode(codeRecord.id)
   await verifyAccountEmail(account.id)
 
   return { message: 'Email verified successfully' }
@@ -278,15 +283,11 @@ export async function requestPasswordReset(email) {
   if (!account) return
 
   // Generate and store password-reset code
-  const code = generateVerificationCode()
-  const codeHash = hashVerificationCode(code)
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 min
-
-  await createPasswordResetToken({
-    accountId: account.id,
-    tokenHash: codeHash,
-    expiresAt,
-  })
+  const code = await createAndStoreVerificationCode(
+    account.id,
+    'RESET_PASSWORD',
+    5
+  )
 
   // Publish event to RabbitMQ for notification service
   await publishPasswordResetRequested({ email, code })
@@ -298,32 +299,49 @@ export async function verfiyPasswordResetCode(email, code) {
   const account = await findAccountByEmail(email)
   if (!account) throw new Error('Account not found')
 
-  const tokenRecord = await findValidPasswordResetToken(account.id)
-  if (!tokenRecord) throw new Error('No valid reset code found or code expired')
+  const codeRecord = await findValidVerificationCode(account.id)
+  if (!codeRecord) throw new Error('No valid reset code found or code expired')
 
-  const valid = verifyCodeHash(code, tokenRecord.tokenHash)
-  if (!valid) throw new Error('Invalid reset code')
+  const valid = verifyCodeHash(code, codeRecord.codeHash)
+  if (!valid) throw new Error('Incorrect password-reset code')
+
+  // if valid, invalidate this code
+  await invalidateVerificationCode(codeRecord.id)
 
   // Issue a short-lived JWT for password reset
+  const jti = randomUUID()
   const payload = {
-    sub: account.id,
+    jti,
     email: account.email,
-    purpose: 'password_reset',
+    purpose: 'RESET_PASSWORD',
   }
-  const reset_token = await signJwt(payload, { expiresIn: '5m' })
+  const resetToken = await signJwt(payload, {
+    sub: account.id,
+    expiresIn: '3m',
+  })
 
-  return { reset_token, expires_in: 300 }
+  await createVerificationToken({
+    codeId: codeRecord.id,
+    jti,
+    expiresAt: new Date(Date.now() + 3 * 60 * 1000),
+  })
+
+  return { resetToken, expiresIn: 180 }
 }
 
-export async function setNewPassword(email, newPassword) {
+export async function setNewPassword(email, newPassword, jti) {
+  // check if the token is revoked
+  const tokenRecord = await findVerificationTokenByJti(jti)
+  if (tokenRecord.revoked) throw new Error('Reset token revoked')
   // find the account
   const account = await findAccountByEmail(email)
   if (!account) throw new Error('Account not found')
 
   // update password and revoke all refresh tokens
   const newPasswordHash = await hashPassword(newPassword)
-  await updateAccountPassword(account.id, newPasswordHash)
+  await revokeVerificationTokenByJti(jti)
   await revokeAllRefreshTokensForAccount(account.id)
+  await updateAccountPassword(account.id, newPasswordHash)
 
   return { message: 'Password reset successfully' }
 }
