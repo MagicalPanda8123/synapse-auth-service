@@ -315,17 +315,9 @@ export async function verfiyPasswordResetCode(email, code) {
   return { reset_token, expires_in: 300 }
 }
 
-export async function setNewPassword(resetToken, newPassword) {
-  // verify the reset token
-  const payload = await verifyJwt(resetToken)
-
-  // check purpose claim
-  if (payload.purpose !== 'password_reset') {
-    throw new Error('Invalid token expired')
-  }
-
+export async function setNewPassword(email, newPassword) {
   // find the account
-  const account = await findAccountByEmail(payload.email)
+  const account = await findAccountByEmail(email)
   if (!account) throw new Error('Account not found')
 
   // update password and revoke all refresh tokens

@@ -182,13 +182,15 @@ export async function verifyPasswordResetCodeController(req, res, next) {
 
 export async function setNewPasswordController(req, res, next) {
   try {
-    const { reset_token, newPassword } = req.body
-    if (!reset_token || !newPassword) {
-      return res
-        .status(400)
-        .json({ error: 'Reset token and new password are required' })
+    const { newPassword } = req.body
+    const { email, purpose } = req.user
+    if (!newPassword) {
+      return res.status(400).json({ error: 'newPassword is required' })
     }
-    const result = await setNewPassword(reset_token, newPassword)
+    if (purpose !== 'password_reset') {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+    const result = await setNewPassword(email, newPassword)
     res.json(result)
   } catch (error) {
     next(error)

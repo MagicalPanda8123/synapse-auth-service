@@ -11,7 +11,7 @@ export async function authMiddleware(req, res, next) {
     const token = authHeader.split(' ')[1]
     const payload = await verifyJwt(token)
 
-    console.log(`auth mid payload :`, payload)
+    // console.log(`auth mid payload :`, payload)
 
     req.user = payload
     next()
