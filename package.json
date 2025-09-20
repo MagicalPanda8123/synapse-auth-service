@@ -9,6 +9,9 @@
     "start": "node server.js",
     "db:reset": "prisma migrate reset --force"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -17,6 +20,8 @@
     "@prisma/client": "^6.16.1",
     "amqplib": "^0.10.9",
     "argon2": "^0.44.0",
+    "axios": "^1.12.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^17.2.2",

@@ -5,11 +5,9 @@ export async function createRefreshToken(data) {
 }
 
 // find VALID refresh token (ie. not revoked, not expired)
-export async function findRefreshTokenByHash(tokenHash) {
+export async function findRefreshTokenByJti(jti) {
   // use findFirst because of its lookup behavior (either returns the first match or null)
-  return await prisma.refreshToken.findFirst({
-    where: { tokenHash, revoked: false, expiresAt: { gt: new Date() } },
-  })
+  return await prisma.refreshToken.findFirst({ where: { jti } })
 }
 
 export async function revokeRefreshTokenById(id) {
@@ -19,10 +17,9 @@ export async function revokeRefreshTokenById(id) {
   })
 }
 
-export async function revokeRefreshTokenByHash(tokenHash) {
-  console.log(`got hereeeee ${tokenHash}`)
+export async function revokeRefreshTokenByJti(jti) {
   return await prisma.refreshToken.updateMany({
-    where: { tokenHash },
+    where: { jti },
     data: { revoked: true },
   })
 }

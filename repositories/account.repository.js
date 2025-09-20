@@ -25,3 +25,14 @@ export async function updateAccountPassword(accountId, newHash) {
     data: { passwordHash: newHash },
   })
 }
+
+export async function deleteAccount(accountId) {
+  return await prisma.account.delete({ where: { id: accountId } })
+}
+
+export async function addUserId(accountId, userId) {
+  return await prisma.account.update({
+    where: { id: accountId },
+    data: { userId },
+  })
+}

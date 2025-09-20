@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { authMiddleware } from '../middleware/index.js'
 import {
   changePassWordController,
   loginController,
@@ -33,12 +34,12 @@ router.post('/refresh', refreshController)
 
 router.post('/logout', logoutController)
 
-router.post('/change-password', changePassWordController)
+router.post('/change-password', authMiddleware, changePassWordController)
 
 router.post('/request-password-reset', requestPasswordResetController)
 
 router.post('/verify-reset-code', verifyPasswordResetCodeController)
 
-router.post('/set-new-password', setNewPasswordController)
+router.post('/set-new-password', authMiddleware, setNewPasswordController)
 
 export default router
