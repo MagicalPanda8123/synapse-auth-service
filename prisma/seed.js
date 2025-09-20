@@ -51,6 +51,51 @@ async function main() {
         status: 'ACTIVE',
       },
       {
+        id: 'acc006',
+        userId: 'user006',
+        email: 'testuser6@example.com',
+        passwordHash: await hashPassword('password6'),
+        isEmailVerified: true,
+        role: 'USER',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'acc007',
+        userId: 'user007',
+        email: 'testuser7@example.com',
+        passwordHash: await hashPassword('password7'),
+        isEmailVerified: true,
+        role: 'USER',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'acc008',
+        userId: 'user008',
+        email: 'testuser8@example.com',
+        passwordHash: await hashPassword('password8'),
+        isEmailVerified: true,
+        role: 'USER',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'acc009',
+        userId: 'user009',
+        email: 'testuser9@example.com',
+        passwordHash: await hashPassword('password9'),
+        isEmailVerified: true,
+        role: 'USER',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'acc010',
+        userId: 'user010',
+        email: 'testuser10@example.com',
+        passwordHash: await hashPassword('password10'),
+        isEmailVerified: true,
+        role: 'USER',
+        status: 'ACTIVE',
+      },
+      {
         id: 'accadmin',
         userId: 'useradmin',
         email: 'admin@example.com',
@@ -62,6 +107,13 @@ async function main() {
     ],
     skipDuplicates: true,
   })
+
+  console.log('✅ Auth seed data created successfully!')
+  console.log('👤 Accounts: 11 (10 USER + 1 SYSTEM_ADMIN)')
+  console.log(
+    '🔑 All accounts have default passwords (password1-10, adminpassword)'
+  )
+  console.log('✅ All accounts are verified and active')
 }
 
 main()
