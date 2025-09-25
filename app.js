@@ -9,9 +9,26 @@ import { errorHandler } from './middleware/error.middleware.js'
 
 const app = express()
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://192.168.1.7:3000',
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+};
+
 // 🔐 security middlewares
 app.use(helmet())
-app.use(cors({ origin: '*' })) // adjust for production
+// app.use(cors({ origin: '*' }))
+app.use(cors(corsOptions))
 
 // 🧰 built-in middlewares
 app.use(cookieParser())
