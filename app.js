@@ -27,8 +27,7 @@ const corsOptions = {
 
 // 🔐 security middlewares
 app.use(helmet())
-// app.use(cors({ origin: '*' }))
-app.use(cors(corsOptions))
+app.use(cors({ origin: 'http://localhost:3000', credentials: true })) // adjust for production
 
 // 🧰 built-in middlewares
 app.use(cookieParser())
@@ -48,7 +47,7 @@ app.get('/health', async (req, res) => {
       uptime: process.uptime(),
       memory: process.memoryUsage().rss,
       hostname: os.hostname(),
-      timeStamp: new Date().toISOString(),
+      timeStamp: new Date().toISOString()
     })
   } catch (error) {
     res.status(503).json({ status: 'failed', error: error.message })
