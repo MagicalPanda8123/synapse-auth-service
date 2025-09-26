@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { authMiddleware } from '../middleware/index.js'
 import {
   changePassWordController,
+  getMeController,
   loginController,
   logoutController,
   refreshController,
@@ -11,7 +12,7 @@ import {
   serveJWKS,
   setNewPasswordController,
   verifyEmail,
-  verifyPasswordResetCodeController,
+  verifyPasswordResetCodeController
 } from '../controllers/auth.controller.js'
 
 const router = Router()
@@ -19,6 +20,8 @@ const router = Router()
 router.get('/', (req, res) => {
   res.json('hello world')
 })
+
+router.get('/me', authMiddleware, getMeController)
 
 router.post('/register', register)
 

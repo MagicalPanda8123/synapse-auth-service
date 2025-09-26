@@ -1,5 +1,6 @@
 import {
   changePassword,
+  getMe,
   login,
   logout,
   refreshAccessToken,
@@ -8,7 +9,7 @@ import {
   resendVerificationCode,
   setNewPassword,
   verfiyPasswordResetCode,
-  verifyEmailCode,
+  verifyEmailCode
 } from '../services/auth.service.js'
 import { getJWKS } from '../utils/jwks.js'
 
@@ -16,27 +17,12 @@ export async function register(req, res, next) {
   try {
     const { email, password, username, firstName, lastName, gender } = req.body
     // const username = `${req.body.firstName} ${req.body.lastName}`
-    if (
-      !email ||
-      !password ||
-      !username ||
-      !firstName ||
-      !lastName ||
-      !gender
-    ) {
+    if (!email || !password || !username || !firstName || !lastName || !gender) {
       return res.status(400).json({
-        error:
-          'email, password, username, firstName, lastName, gender are required',
+        error: 'email, password, username, firstName, lastName, gender are required'
       })
     }
-    await registerAccount(
-      email,
-      password,
-      username,
-      firstName,
-      lastName,
-      gender
-    )
+    await registerAccount(email, password, username, firstName, lastName, gender)
     res.status(201).json({ message: 'Account created successfully' })
   } catch (error) {
     next(error)
@@ -88,7 +74,7 @@ export async function loginController(req, res, next) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, //  7 days of expiry
+      maxAge: 7 * 24 * 60 * 60 * 1000 //  7 days of expiry
     })
     res.json(filtered)
   } catch (error) {
@@ -111,7 +97,7 @@ export async function refreshController(req, res, next) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, //  7 days of expiry
+      maxAge: 7 * 24 * 60 * 60 * 1000 //  7 days of expiry
     })
     res.json(filtered)
   } catch (error) {
@@ -144,7 +130,7 @@ export async function changePassWordController(req, res, next) {
     const { email } = req.user
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
-        error: 'Missing required fields (currentPassword, newPassword)',
+        error: 'Missing required fields (currentPassword, newPassword)'
       })
     }
     await changePassword(email, currentPassword, newPassword)
@@ -192,6 +178,21 @@ export async function setNewPasswordController(req, res, next) {
     }
     const result = await setNewPassword(email, newPassword, jti)
     res.json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function getMeController(req, res, next) {
+  try {
+    const email = req.user.email
+
+    const user = await getMe(email)
+    res.json({
+      id: user.userId,
+      email: user.email,
+      role: user.role
+    })
   } catch (error) {
     next(error)
   }

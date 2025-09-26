@@ -8,7 +8,7 @@ import {
   signInternalJwt,
   generateRefreshJwt,
   verifyJwt,
-  verifyRefreshJwt,
+  verifyRefreshJwt
 } from '../utils/index.js'
 
 import {
@@ -30,14 +30,10 @@ import {
   invalidateAllVerificationCodes,
   createVerificationToken,
   revokeVerificationTokenByJti,
-  findVerificationTokenByJti,
+  findVerificationTokenByJti
 } from '../repositories/index.js'
 
-import {
-  publishAccountRegistered,
-  publishPasswordChanged,
-  publishPasswordResetRequested,
-} from '../events/publishers/account.publisher.js'
+import { publishAccountRegistered, publishPasswordChanged, publishPasswordResetRequested } from '../events/publishers/account.publisher.js'
 
 import axios from 'axios'
 import { randomUUID } from 'crypto'
@@ -49,12 +45,12 @@ async function generateTokenPair(account) {
   // access token
   const payload = {
     email: account.email,
-    role: account.role,
+    role: account.role
   }
   const accessToken = await signJwt(payload, {
     sub: account.userId,
     iss: 'auth-service',
-    aud: 'synapse-api',
+    aud: 'synapse-api'
   })
 
   // refresh token
@@ -64,7 +60,7 @@ async function generateTokenPair(account) {
   await createRefreshToken({
     accountId: account.id,
     jti,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   })
 
   return {
@@ -75,17 +71,13 @@ async function generateTokenPair(account) {
     user: {
       id: account.userId,
       email: account.email,
-      role: account.role,
-    },
+      role: account.role
+    }
   }
 }
 
 // Create and Store the verification code with custom purpose and duration (in minutes)
-async function createAndStoreVerificationCode(
-  accountId,
-  purpose,
-  duration = 15
-) {
+async function createAndStoreVerificationCode(accountId, purpose, duration = 15) {
   const code = generateVerificationCode()
   const codeHash = hashVerificationCode(code)
   const expiresAt = new Date(Date.now() + duration * 60 * 1000) // expiration of 15min
@@ -94,7 +86,7 @@ async function createAndStoreVerificationCode(
     accountId,
     codeHash,
     purpose,
-    expiresAt,
+    expiresAt
   })
 
   return code
@@ -104,14 +96,7 @@ async function createAndStoreVerificationCode(
  * !!! HERE COMES THE MAIN FUNCTIONS ----------------------------------------------------------------------
  */
 
-export async function registerAccount(
-  email,
-  password,
-  username,
-  firstName,
-  lastName,
-  gender
-) {
+export async function registerAccount(email, password, username, firstName, lastName, gender) {
   // Check if user exists
   const existing = await findAccountByEmail(email)
   if (existing) {
@@ -124,20 +109,20 @@ export async function registerAccount(
   // Save to DB
   const account = await createAccount({
     email,
-    passwordHash: hashedPassword,
+    passwordHash: hashedPassword
   })
 
   // Issue internal JWT for service-to-service communication
   const internalJwt = await signInternalJwt(
     {
       //custom claims
-      permissions: ['users:create'],
+      permissions: ['users:create']
     },
     {
       iss: 'auth-service',
       sub: 'auth-service',
       aud: 'user-service',
-      expiresIn: '5m',
+      expiresIn: '5m'
     }
   )
 
@@ -151,19 +136,16 @@ export async function registerAccount(
         username,
         first_name: firstName,
         last_name: lastName,
-        gender,
+        gender
       },
       {
         headers: {
-          Authorization: `Bearer ${internalJwt}`,
-        },
+          Authorization: `Bearer ${internalJwt}`
+        }
       }
     )
   } catch (err) {
-    console.error(
-      '[User Service] Failed to create user:',
-      err.response?.data || err.message
-    )
+    console.error('[User Service] Failed to create user:', err.response?.data || err.message)
     //Rollback: delete the newly created account
     await deleteAccount(account.id)
     throw new Error('Failed to create user profile in user service')
@@ -283,11 +265,7 @@ export async function requestPasswordReset(email) {
   if (!account) return
 
   // Generate and store password-reset code
-  const code = await createAndStoreVerificationCode(
-    account.id,
-    'RESET_PASSWORD',
-    5
-  )
+  const code = await createAndStoreVerificationCode(account.id, 'RESET_PASSWORD', 5)
 
   // Publish event to RabbitMQ for notification service
   await publishPasswordResetRequested({ email, code })
@@ -313,17 +291,17 @@ export async function verfiyPasswordResetCode(email, code) {
   const payload = {
     jti,
     email: account.email,
-    purpose: 'RESET_PASSWORD',
+    purpose: 'RESET_PASSWORD'
   }
   const resetToken = await signJwt(payload, {
     sub: account.id,
-    expiresIn: '3m',
+    expiresIn: '3m'
   })
 
   await createVerificationToken({
     codeId: codeRecord.id,
     jti,
-    expiresAt: new Date(Date.now() + 3 * 60 * 1000),
+    expiresAt: new Date(Date.now() + 3 * 60 * 1000)
   })
 
   return { resetToken, expiresIn: 180 }
@@ -344,4 +322,8 @@ export async function setNewPassword(email, newPassword, jti) {
   await updateAccountPassword(account.id, newPasswordHash)
 
   return { message: 'Password reset successfully' }
+}
+
+export async function getMe(email) {
+  return await findAccountByEmail(email)
 }
