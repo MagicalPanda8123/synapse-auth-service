@@ -6,13 +6,31 @@ async function main() {
   await prisma.account.createMany({
     data: [
       {
+        id: 'acc999',
+        userId: 'user999',
+        email: 'm.khang8123@gmail.com',
+        passwordHash: await hashPassword('minhkhang123'),
+        isEmailVerified: true,
+        role: 'USER',
+        status: 'ACTIVE'
+      },
+      {
+        id: 'acc888',
+        userId: 'user888',
+        email: 'dhlananh2309@gmail.com',
+        passwordHash: await hashPassword('lananh123'),
+        isEmailVerified: true,
+        role: 'USER',
+        status: 'ACTIVE'
+      },
+      {
         id: 'acc001',
         userId: 'user001',
         email: 'testuser1@example.com',
         passwordHash: await hashPassword('password1'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc002',
@@ -21,7 +39,7 @@ async function main() {
         passwordHash: await hashPassword('password2'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc003',
@@ -30,7 +48,7 @@ async function main() {
         passwordHash: await hashPassword('password3'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc004',
@@ -39,7 +57,7 @@ async function main() {
         passwordHash: await hashPassword('password4'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc005',
@@ -48,7 +66,7 @@ async function main() {
         passwordHash: await hashPassword('password5'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc006',
@@ -57,7 +75,7 @@ async function main() {
         passwordHash: await hashPassword('password6'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc007',
@@ -66,7 +84,7 @@ async function main() {
         passwordHash: await hashPassword('password7'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc008',
@@ -75,7 +93,7 @@ async function main() {
         passwordHash: await hashPassword('password8'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc009',
@@ -84,7 +102,7 @@ async function main() {
         passwordHash: await hashPassword('password9'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'acc010',
@@ -93,7 +111,7 @@ async function main() {
         passwordHash: await hashPassword('password10'),
         isEmailVerified: true,
         role: 'USER',
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
       {
         id: 'accadmin',
@@ -102,17 +120,15 @@ async function main() {
         passwordHash: await hashPassword('adminpassword'),
         isEmailVerified: true,
         role: 'SYSTEM_ADMIN',
-        status: 'ACTIVE',
-      },
+        status: 'ACTIVE'
+      }
     ],
-    skipDuplicates: true,
+    skipDuplicates: true
   })
 
   console.log('✅ Auth seed data created successfully!')
   console.log('👤 Accounts: 11 (10 USER + 1 SYSTEM_ADMIN)')
-  console.log(
-    '🔑 All accounts have default passwords (password1-10, adminpassword)'
-  )
+  console.log('🔑 All accounts have default passwords (password1-10, adminpassword)')
   console.log('✅ All accounts are verified and active')
 }
 
