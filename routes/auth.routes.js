@@ -43,6 +43,6 @@ router.post('/request-password-reset', requestPasswordResetController)
 
 router.post('/verify-reset-code', verifyPasswordResetCodeController)
 
-router.post('/set-new-password', authMiddleware, setNewPasswordController)
+router.post('/set-new-password', setNewPasswordController)
 
 export default router

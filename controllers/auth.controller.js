@@ -12,6 +12,7 @@ import {
   verifyEmailCode
 } from '../services/auth.service.js'
 import { getJWKS } from '../utils/jwks.js'
+import { verifyJwt } from '../utils/jwt.js'
 
 export async function register(req, res, next) {
   try {
@@ -160,7 +161,19 @@ export async function verifyPasswordResetCodeController(req, res, next) {
       return res.status(400).json({ error: 'Email and reset code are reuired' })
     }
     const result = await verfiyPasswordResetCode(email, code)
-    res.json(result)
+
+    const { resetToken, expiresIn } = result
+    res.cookie('resetToken', resetToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: expiresIn * 1000 // convert seconds to miliseconds
+    })
+
+    res.json({
+      message: 'Reset code verified successfully',
+      expiresIn
+    })
   } catch (error) {
     next(error)
   }
@@ -169,14 +182,32 @@ export async function verifyPasswordResetCodeController(req, res, next) {
 export async function setNewPasswordController(req, res, next) {
   try {
     const { newPassword } = req.body
-    const { jti, email, purpose } = req.user
+
+    // Read reset token from cookie
+    const resetToken = req.cookies.resetToken
+    if (!resetToken) {
+      return res.status(400).json({ error: 'Reset token is required' })
+    }
     if (!newPassword) {
       return res.status(400).json({ error: 'newPassword is required' })
     }
+
+    let payload
+    try {
+      payload = await verifyJwt(resetToken)
+    } catch (error) {
+      return res.status(401).json({ error: 'Invalid or expired reset token' })
+    }
+
+    const { jti, email, purpose } = payload
     if (purpose !== 'RESET_PASSWORD') {
       return res.status(403).json({ error: 'Forbidden' })
     }
     const result = await setNewPassword(email, newPassword, jti)
+
+    //Clear the reset token cookie after successful password reset
+    res.clearCookie('resetToken')
+
     res.json(result)
   } catch (error) {
     next(error)
