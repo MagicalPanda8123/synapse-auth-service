@@ -9,7 +9,7 @@ import {
   resendVerificationCode,
   setNewPassword,
   verfiyPasswordResetCode,
-  verifyEmailCode
+  verifyEmailCode,
 } from '../services/auth.service.js'
 import { getJWKS } from '../utils/jwks.js'
 import { verifyJwt } from '../utils/jwt.js'
@@ -20,7 +20,7 @@ export async function register(req, res, next) {
     // const username = `${req.body.firstName} ${req.body.lastName}`
     if (!email || !password || !username || !firstName || !lastName || !gender) {
       return res.status(400).json({
-        error: 'email, password, username, firstName, lastName, gender are required'
+        error: 'email, password, username, firstName, lastName, gender are required',
       })
     }
     await registerAccount(email, password, username, firstName, lastName, gender)
@@ -70,12 +70,18 @@ export async function loginController(req, res, next) {
     const result = await login(email, password)
 
     // extract refreshToken and set in HTTP-only cookie
-    const { refreshToken, ...filtered } = result
+    const { refreshToken, accessToken, accessTokenExpiresIn, refreshTokenExpiresIn, ...filtered } = result
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 //  7 days of expiry
+      maxAge: refreshTokenExpiresIn * 1000, // convert to ms
+    })
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: accessTokenExpiresIn * 1000, // convert to ms
     })
     res.json(filtered)
   } catch (error) {
@@ -85,23 +91,30 @@ export async function loginController(req, res, next) {
 
 export async function refreshController(req, res, next) {
   try {
-    // Read refresh token from cookie
     const refreshToken = req.cookies.refreshToken
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token is required' })
     }
     const result = await refreshAccessToken(refreshToken)
 
-    // extract refreshToken and set in HTTP-only cookie
-    const { refreshToken: newRefreshToken, ...filtered } = result
+    const { refreshToken: newRefreshToken, accessToken, accessTokenExpiresIn, refreshTokenExpiresIn, ...filtered } = result
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 //  7 days of expiry
+      maxAge: refreshTokenExpiresIn * 1000, // convert to ms
+    })
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: accessTokenExpiresIn * 1000, // convert to ms
     })
     res.json(filtered)
   } catch (error) {
+    if (error.message.includes('Refresh token revoked')) {
+      res.status(401).json({ error: 'Refresh token revoked' })
+    }
     next(error)
   }
 }
@@ -117,6 +130,7 @@ export async function logoutController(req, res, next) {
 
     // clear the cookie after logging out
     res.clearCookie('refreshToken')
+    res.clearCookie('accessToken')
     res.json({ message: 'Logged out successfully' })
   } catch (error) {
     next(error)
@@ -131,7 +145,7 @@ export async function changePassWordController(req, res, next) {
     const { email } = req.user
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
-        error: 'Missing required fields (currentPassword, newPassword)'
+        error: 'Missing required fields (currentPassword, newPassword)',
       })
     }
     await changePassword(email, currentPassword, newPassword)
@@ -167,12 +181,12 @@ export async function verifyPasswordResetCodeController(req, res, next) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: expiresIn * 1000 // convert seconds to miliseconds
+      maxAge: expiresIn * 1000, // convert seconds to miliseconds
     })
 
     res.json({
       message: 'Reset code verified successfully',
-      expiresIn
+      expiresIn,
     })
   } catch (error) {
     next(error)
@@ -222,7 +236,7 @@ export async function getMeController(req, res, next) {
     res.json({
       id: user.userId,
       email: user.email,
-      role: user.role
+      role: user.role,
     })
   } catch (error) {
     next(error)

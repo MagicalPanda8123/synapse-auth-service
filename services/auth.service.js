@@ -8,7 +8,7 @@ import {
   signInternalJwt,
   generateRefreshJwt,
   verifyJwt,
-  verifyRefreshJwt
+  verifyRefreshJwt,
 } from '../utils/index.js'
 
 import {
@@ -30,7 +30,7 @@ import {
   invalidateAllVerificationCodes,
   createVerificationToken,
   revokeVerificationTokenByJti,
-  findVerificationTokenByJti
+  findVerificationTokenByJti,
 } from '../repositories/index.js'
 
 import { publishAccountRegistered, publishPasswordChanged, publishPasswordResetRequested } from '../events/publishers/account.publisher.js'
@@ -45,12 +45,12 @@ async function generateTokenPair(account) {
   // access token
   const payload = {
     email: account.email,
-    role: account.role
+    role: account.role,
   }
   const accessToken = await signJwt(payload, {
     sub: account.userId,
     iss: 'auth-service',
-    aud: 'synapse-api'
+    aud: 'synapse-api',
   })
 
   // refresh token
@@ -60,19 +60,20 @@ async function generateTokenPair(account) {
   await createRefreshToken({
     accountId: account.id,
     jti,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   })
 
   return {
     accessToken,
     refreshToken,
-    tokenType: 'Bearer',
-    expiresIn: 900,
+    // tokenType: 'Bearer',
+    accessTokenExpiresIn: 900, // 15 minutes in seconds
+    refreshTokenExpiresIn: 7 * 24 * 60 * 60, // 7 days in seconds
     user: {
       id: account.userId,
       email: account.email,
-      role: account.role
-    }
+      role: account.role,
+    },
   }
 }
 
@@ -86,7 +87,7 @@ async function createAndStoreVerificationCode(accountId, purpose, duration = 15)
     accountId,
     codeHash,
     purpose,
-    expiresAt
+    expiresAt,
   })
 
   return code
@@ -109,20 +110,20 @@ export async function registerAccount(email, password, username, firstName, last
   // Save to DB
   const account = await createAccount({
     email,
-    passwordHash: hashedPassword
+    passwordHash: hashedPassword,
   })
 
   // Issue internal JWT for service-to-service communication
   const internalJwt = await signInternalJwt(
     {
       //custom claims
-      permissions: ['users:create']
+      permissions: ['users:create'],
     },
     {
       iss: 'auth-service',
       sub: 'auth-service',
       aud: 'user-service',
-      expiresIn: '5m'
+      expiresIn: '5m',
     }
   )
 
@@ -136,12 +137,12 @@ export async function registerAccount(email, password, username, firstName, last
         username,
         first_name: firstName,
         last_name: lastName,
-        gender
+        gender,
       },
       {
         headers: {
-          Authorization: `Bearer ${internalJwt}`
-        }
+          Authorization: `Bearer ${internalJwt}`,
+        },
       }
     )
   } catch (err) {
@@ -291,17 +292,17 @@ export async function verfiyPasswordResetCode(email, code) {
   const payload = {
     jti,
     email: account.email,
-    purpose: 'RESET_PASSWORD'
+    purpose: 'RESET_PASSWORD',
   }
   const resetToken = await signJwt(payload, {
     sub: account.id,
-    expiresIn: '3m'
+    expiresIn: '3m',
   })
 
   await createVerificationToken({
     codeId: codeRecord.id,
     jti,
-    expiresAt: new Date(Date.now() + 3 * 60 * 1000)
+    expiresAt: new Date(Date.now() + 3 * 60 * 1000),
   })
 
   return { resetToken, expiresIn: 180 }

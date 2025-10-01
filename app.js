@@ -10,11 +10,18 @@ import { errorHandler } from './middleware/error.middleware.js'
 const app = express()
 
 // 🔐 security middlewares
+app.use(
+  cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'authorization', 'Content-Type'],
+  })
+)
 app.use(helmet())
-app.use(cors({ origin: 'http://localhost:3000', credentials: true })) // adjust for production
+app.use(cookieParser())
 
 // 🧰 built-in middlewares
-app.use(cookieParser())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -31,7 +38,7 @@ app.get('/health', async (req, res) => {
       uptime: process.uptime(),
       memory: process.memoryUsage().rss,
       hostname: os.hostname(),
-      timeStamp: new Date().toISOString()
+      timeStamp: new Date().toISOString(),
     })
   } catch (error) {
     res.status(503).json({ status: 'failed', error: error.message })
