@@ -31,6 +31,7 @@ import {
   createVerificationToken,
   revokeVerificationTokenByJti,
   findVerificationTokenByJti,
+  updatUsername,
 } from '../repositories/index.js'
 
 import { publishAccountRegistered, publishPasswordChanged, publishPasswordResetRequested } from '../events/publishers/account.publisher.js'
@@ -45,6 +46,7 @@ async function generateTokenPair(account) {
   // access token
   const payload = {
     email: account.email,
+    username: account.username,
     role: account.role,
   }
   const accessToken = await signJwt(payload, {
@@ -72,6 +74,7 @@ async function generateTokenPair(account) {
     user: {
       id: account.userId,
       email: account.email,
+      username: account.username,
       role: account.role,
     },
   }
@@ -327,4 +330,8 @@ export async function setNewPassword(email, newPassword, jti) {
 
 export async function getMe(email) {
   return await findAccountByEmail(email)
+}
+
+export async function updateUsernameForUser(userId, newUsername) {
+  return await updatUsername(userId, newUsername)
 }

@@ -36,3 +36,10 @@ export async function addUserId(accountId, userId) {
     data: { userId },
   })
 }
+
+export async function updatUsername(userId, newUsername) {
+  return await prisma.account.update({
+    where: { userId },
+    data: { username: newUsername },
+  })
+}

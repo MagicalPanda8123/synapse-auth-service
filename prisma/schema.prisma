@@ -16,6 +16,7 @@ datasource db {
 model Account {
   id              String  @id @default(uuid())
   userId          String? @unique
+  username        String  @unique
   email           String  @unique
   passwordHash    String
   isEmailVerified Boolean @default(false)
