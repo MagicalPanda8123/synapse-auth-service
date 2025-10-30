@@ -95,6 +95,7 @@ export async function refreshController(req, res, next) {
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token is required' })
     }
+
     const result = await refreshAccessToken(refreshToken)
 
     const { refreshToken: newRefreshToken, accessToken, accessTokenExpiresIn, refreshTokenExpiresIn, ...filtered } = result
@@ -113,9 +114,12 @@ export async function refreshController(req, res, next) {
     res.json(filtered)
   } catch (error) {
     if (error.message.includes('Refresh token revoked')) {
+      // Clear the refresh token cookie if revoked
+      res.clearCookie('refreshToken')
       res.status(401).json({ error: 'Refresh token revoked' })
+    } else {
+      next(error)
     }
-    next(error)
   }
 }
 
