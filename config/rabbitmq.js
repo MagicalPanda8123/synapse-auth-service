@@ -6,9 +6,7 @@ let shuttingDown = false
 export async function getChannel() {
   while (!channel) {
     try {
-      connection = await amqp.connect(
-        process.env.RABBITMQ_URL || 'amqp://localhost'
-      )
+      connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost')
       connection.on('error', (err) => {
         console.error('[RabbitMQ] Connection error: ', err.message)
       })
@@ -23,7 +21,7 @@ export async function getChannel() {
         }
       })
       channel = await connection.createChannel()
-      console.log('[RabbitMQ] ✅ Connected and Channel created')
+      console.log('✅ [RabbitMQ] Connected and Channel created')
       return channel
     } catch (error) {
       console.error('[RabbitMQ] Failed to connect:', error.message)

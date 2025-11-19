@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import os from 'os'
 import routes from './routes/index.js'
+import adminRoutes from './routes/admin.routes.js'
 import prisma from './config/prisma.js'
 import { errorHandler } from './middleware/error.middleware.js'
 
@@ -47,6 +48,7 @@ app.get('/health', async (req, res) => {
 
 // 🌐 api routes
 app.use('/api', routes)
+app.use('/api/auth/admin', adminRoutes)
 
 // ❌ error handler
 app.use(errorHandler)

@@ -24,13 +24,15 @@ model Account {
   role   AccountRole   @default(USER)
   status AccountStatus @default(PENDING)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   refreshTokens    RefreshToken[]
   verificationCode VerificationCode[]
+  logs             AccountLog[]
 
-  @@index([createdAt])
+  @@index([createdAt, id])
   @@index([status])
 }
 
@@ -79,6 +81,38 @@ model RefreshToken {
   @@index([accountId, revoked])
 }
 
+model AccountLog {
+  id          String    @id @default(uuid())
+  accountId   String
+  action      LogAction
+  performedBy String? // ID of the admin or system process that performed the action
+  details     String? // Optional details about the action
+  createdAt   DateTime  @default(now())
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model UserSummary {
+  id                String   @id @default(uuid())
+  summaryDate       DateTime // Explicit date for the summary
+  totalUsers        Int
+  activeUsers       Int
+  suspendedUsers    Int
+  pendingUsers      Int
+  newUsers          Int
+  newActiveUsers    Int      @default(0) // New users with ACTIVE status
+  newSuspendedUsers Int      @default(0) // New users with SUSPENDED status
+  newPendingUsers   Int      @default(0) // New users with PENDING status
+  newBannedUsers    Int      @default(0) // New users with BANNED status
+  createdAt         DateTime @default(now()) // Tracks when the record was written
+
+  @@index([summaryDate]) // Index for querying by summary date
+}
+
 enum AccountRole {
   USER
   SYSTEM_ADMIN
@@ -94,4 +128,14 @@ enum AccountStatus {
 enum CodePurpose {
   VERIFY_EMAIL
   RESET_PASSWORD
+}
+
+enum LogAction {
+  ACCOUNT_CREATED
+  ACCOUNT_UPDATED
+  ACCOUNT_BANNED
+  ACCOUNT_SUSPENDED
+  ACCOUNT_ACTIVATED
+  PASSWORD_CHANGED
+  EMAIL_VERIFIED
 }

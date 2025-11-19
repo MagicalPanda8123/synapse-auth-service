@@ -11,6 +11,8 @@ import {
   verifyRefreshJwt,
 } from '../utils/index.js'
 
+import { CustomError } from '../utils/customError.js'
+
 import {
   createAccount,
   deleteAccount,
@@ -32,6 +34,7 @@ import {
   revokeVerificationTokenByJti,
   findVerificationTokenByJti,
   updatUsername,
+  findAccountByUsername,
 } from '../repositories/index.js'
 
 import { publishAccountRegistered, publishPasswordChanged, publishPasswordResetRequested } from '../events/publishers/account.publisher.js'
@@ -102,9 +105,16 @@ async function createAndStoreVerificationCode(accountId, purpose, duration = 15)
 
 export async function registerAccount(email, password, username, firstName, lastName, gender) {
   // Check if user exists
-  const existing = await findAccountByEmail(email)
+  let existing = null
+
+  existing = await findAccountByEmail(email)
   if (existing) {
-    throw new Error('Email already in use')
+    throw new CustomError('Email already in use', 400)
+  }
+
+  existing = await findAccountByUsername(username)
+  if (existing) {
+    throw new CustomError('Username is not available', 409)
   }
 
   // Hash password
@@ -112,6 +122,7 @@ export async function registerAccount(email, password, username, firstName, last
 
   // Save to DB
   const account = await createAccount({
+    username,
     email,
     passwordHash: hashedPassword,
   })
@@ -161,7 +172,7 @@ export async function registerAccount(email, password, username, firstName, last
   console.log(`[User Service] user created : `, userResponse.data)
 
   // Generate and store verification code
-  const code = await createAndStoreVerificationCode(account.id, 'VERIFY_EMAIL')
+  const code = await createAndStoreVerificationCode(account.id, 'VERIFY_EMAIL', 3)
 
   // console.log(`verification code for email ${email} : ${code}`)
 
@@ -212,12 +223,17 @@ export async function verifyEmailCode(email, code) {
 }
 
 export async function login(email, password) {
-  // find the account
+  // Find the account
   const account = await findAccountByEmail(email)
   if (!account) throw new Error('Account not found')
   if (!account.isEmailVerified) throw new Error('Email not verified')
 
-  // compare password hashes
+  // Prevent login for suspended accounts
+  if (account.status === 'SUSPENDED') {
+    throw new Error('Account is suspended')
+  }
+
+  // Compare password hashes
   const valid = await verifyPassword(account.passwordHash, password)
   if (!valid) throw new Error('Incorrect password')
 
@@ -236,7 +252,12 @@ export async function refreshAccessToken(refreshToken) {
   const account = await findAccountById(refreshPayload.sub)
   if (!account) throw new Error('Account not found')
 
-  // revoke this refresh token
+  // Prevent token refresh for suspended accounts
+  if (account.status === 'SUSPENDED') {
+    throw new Error('Account is suspended')
+  }
+
+  // Revoke this refresh token
   await revokeRefreshTokenById(tokenRecord.id)
 
   return await generateTokenPair(account)
