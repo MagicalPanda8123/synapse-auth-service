@@ -3,7 +3,7 @@ import redis from '../../config/redis.js'
 import prisma from '../../config/prisma.js'
 
 const userSummaryWorker = new Worker(
-  'userSummaryQueue', // Queue name
+  '{userSummaryQueue}', // Queue name
   async (job) => {
     try {
       console.log(`Processing job: ${job.name} with jobId: ${job.id}`)

@@ -11,9 +11,9 @@ pnpm-debug.log
 .env.*.local
 
 # Keys (JWT / SSL / etc — mount them at runtime, not in image)
-keys/
-*.pem
-*.key
+# keys/
+# *.pem
+# *.key
 
 # Logs
 logs
