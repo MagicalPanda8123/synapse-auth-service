@@ -13,7 +13,7 @@ const app = express()
 // 🔐 security middlewares
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://frontend-alb-1914665218.ap-southeast-1.elb.amazonaws.com'],
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'authorization', 'Content-Type'],
