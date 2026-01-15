@@ -8,8 +8,10 @@ import {
   signInternalJwt,
   generateRefreshJwt,
   verifyJwt,
-  verifyRefreshJwt
+  verifyRefreshJwt,
 } from '../utils/index.js'
+
+import { CustomError } from '../utils/customError.js'
 
 import {
   createAccount,
@@ -30,7 +32,9 @@ import {
   invalidateAllVerificationCodes,
   createVerificationToken,
   revokeVerificationTokenByJti,
-  findVerificationTokenByJti
+  findVerificationTokenByJti,
+  updatUsername,
+  findAccountByUsername,
 } from '../repositories/index.js'
 
 import { publishAccountRegistered, publishPasswordChanged, publishPasswordResetRequested } from '../events/publishers/account.publisher.js'
@@ -45,12 +49,13 @@ async function generateTokenPair(account) {
   // access token
   const payload = {
     email: account.email,
-    role: account.role
+    username: account.username,
+    role: account.role,
   }
   const accessToken = await signJwt(payload, {
     sub: account.userId,
     iss: 'auth-service',
-    aud: 'synapse-api'
+    aud: 'synapse-api',
   })
 
   // refresh token
@@ -60,19 +65,21 @@ async function generateTokenPair(account) {
   await createRefreshToken({
     accountId: account.id,
     jti,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   })
 
   return {
     accessToken,
     refreshToken,
-    tokenType: 'Bearer',
-    expiresIn: 900,
+    // tokenType: 'Bearer',
+    accessTokenExpiresIn: 900, // 15 minutes in seconds
+    refreshTokenExpiresIn: 7 * 24 * 60 * 60, // 7 days in seconds
     user: {
       id: account.userId,
       email: account.email,
-      role: account.role
-    }
+      username: account.username,
+      role: account.role,
+    },
   }
 }
 
@@ -86,7 +93,7 @@ async function createAndStoreVerificationCode(accountId, purpose, duration = 15)
     accountId,
     codeHash,
     purpose,
-    expiresAt
+    expiresAt,
   })
 
   return code
@@ -98,9 +105,16 @@ async function createAndStoreVerificationCode(accountId, purpose, duration = 15)
 
 export async function registerAccount(email, password, username, firstName, lastName, gender) {
   // Check if user exists
-  const existing = await findAccountByEmail(email)
+  let existing = null
+
+  existing = await findAccountByEmail(email)
   if (existing) {
-    throw new Error('Email already in use')
+    throw new CustomError('Email already in use', 400)
+  }
+
+  existing = await findAccountByUsername(username)
+  if (existing) {
+    throw new CustomError('Username is not available', 409)
   }
 
   // Hash password
@@ -108,21 +122,22 @@ export async function registerAccount(email, password, username, firstName, last
 
   // Save to DB
   const account = await createAccount({
+    username,
     email,
-    passwordHash: hashedPassword
+    passwordHash: hashedPassword,
   })
 
   // Issue internal JWT for service-to-service communication
   const internalJwt = await signInternalJwt(
     {
       //custom claims
-      permissions: ['users:create']
+      permissions: ['users:create'],
     },
     {
       iss: 'auth-service',
       sub: 'auth-service',
       aud: 'user-service',
-      expiresIn: '5m'
+      expiresIn: '5m',
     }
   )
 
@@ -136,12 +151,12 @@ export async function registerAccount(email, password, username, firstName, last
         username,
         first_name: firstName,
         last_name: lastName,
-        gender
+        gender,
       },
       {
         headers: {
-          Authorization: `Bearer ${internalJwt}`
-        }
+          Authorization: `Bearer ${internalJwt}`,
+        },
       }
     )
   } catch (err) {
@@ -157,7 +172,7 @@ export async function registerAccount(email, password, username, firstName, last
   console.log(`[User Service] user created : `, userResponse.data)
 
   // Generate and store verification code
-  const code = await createAndStoreVerificationCode(account.id, 'VERIFY_EMAIL')
+  const code = await createAndStoreVerificationCode(account.id, 'VERIFY_EMAIL', 3)
 
   // console.log(`verification code for email ${email} : ${code}`)
 
@@ -208,12 +223,17 @@ export async function verifyEmailCode(email, code) {
 }
 
 export async function login(email, password) {
-  // find the account
+  // Find the account
   const account = await findAccountByEmail(email)
   if (!account) throw new Error('Account not found')
   if (!account.isEmailVerified) throw new Error('Email not verified')
 
-  // compare password hashes
+  // Prevent login for suspended accounts
+  if (account.status === 'SUSPENDED') {
+    throw new Error('Account is suspended')
+  }
+
+  // Compare password hashes
   const valid = await verifyPassword(account.passwordHash, password)
   if (!valid) throw new Error('Incorrect password')
 
@@ -232,7 +252,12 @@ export async function refreshAccessToken(refreshToken) {
   const account = await findAccountById(refreshPayload.sub)
   if (!account) throw new Error('Account not found')
 
-  // revoke this refresh token
+  // Prevent token refresh for suspended accounts
+  if (account.status === 'SUSPENDED') {
+    throw new Error('Account is suspended')
+  }
+
+  // Revoke this refresh token
   await revokeRefreshTokenById(tokenRecord.id)
 
   return await generateTokenPair(account)
@@ -291,17 +316,17 @@ export async function verfiyPasswordResetCode(email, code) {
   const payload = {
     jti,
     email: account.email,
-    purpose: 'RESET_PASSWORD'
+    purpose: 'RESET_PASSWORD',
   }
   const resetToken = await signJwt(payload, {
     sub: account.id,
-    expiresIn: '3m'
+    expiresIn: '3m',
   })
 
   await createVerificationToken({
     codeId: codeRecord.id,
     jti,
-    expiresAt: new Date(Date.now() + 3 * 60 * 1000)
+    expiresAt: new Date(Date.now() + 3 * 60 * 1000),
   })
 
   return { resetToken, expiresIn: 180 }
@@ -326,4 +351,8 @@ export async function setNewPassword(email, newPassword, jti) {
 
 export async function getMe(email) {
   return await findAccountByEmail(email)
+}
+
+export async function updateUsernameForUser(userId, newUsername) {
+  return await updatUsername(userId, newUsername)
 }

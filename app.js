@@ -4,17 +4,25 @@ import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import os from 'os'
 import routes from './routes/index.js'
+import adminRoutes from './routes/admin.routes.js'
 import prisma from './config/prisma.js'
 import { errorHandler } from './middleware/error.middleware.js'
 
 const app = express()
 
 // 🔐 security middlewares
+app.use(
+  cors({
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://frontend-alb-1914665218.ap-southeast-1.elb.amazonaws.com'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'authorization', 'Content-Type'],
+  })
+)
 app.use(helmet())
-app.use(cors({ origin: 'http://localhost:3000', credentials: true })) // adjust for production
+app.use(cookieParser())
 
 // 🧰 built-in middlewares
-app.use(cookieParser())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -31,7 +39,7 @@ app.get('/health', async (req, res) => {
       uptime: process.uptime(),
       memory: process.memoryUsage().rss,
       hostname: os.hostname(),
-      timeStamp: new Date().toISOString()
+      timeStamp: new Date().toISOString(),
     })
   } catch (error) {
     res.status(503).json({ status: 'failed', error: error.message })
@@ -40,6 +48,7 @@ app.get('/health', async (req, res) => {
 
 // 🌐 api routes
 app.use('/api', routes)
+app.use('/api/auth/admin', adminRoutes)
 
 // ❌ error handler
 app.use(errorHandler)
